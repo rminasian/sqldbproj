@@ -1,0 +1,115 @@
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MsBuildExtensionsPath)\SqlDbProj\SqlDbProj.targets" />
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{bd783696-3b58-4851-bb16-55c7f1d3c995}</ProjectGuid>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>.sql</OutputPath>
+    <ConnectionSettingsFile Condition="$(ConnectionSettingsFile) == ''">ConnectionSettings.xml</ConnectionSettingsFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Migrations\migration-001.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Programmability\1-functions.sql" />
+    <None Include="Programmability\2-procedures.presentation.sql" />
+    <None Include="Programmability\3-procedures.modification.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Sample Data\01-sample.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Infrastructure\createDatabase.sql" />
+    <None Include="Infrastructure\version.sql" />
+    <None Include="Infrastructure\before-migration.sql" />
+    <None Include="Infrastructure\after-migration.sql" />
+    <None Include="Infrastructure\backup.sql" />
+    <None Include="Infrastructure\restore.sql" />
+    <None Include="Infrastructure\drop.sql" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="ConnectionSettings.xml" />
+  </ItemGroup>
+
+  <Target Name="ResolveAssemblyReferences"></Target>
+  
+  <Import Project="$(ConnectionSettingsFile)" />
+  <Target Name="Build" DependsOnTargets="CreateOutputDirectory;BuildStructure;BuildSample;BuildProgrammability;BuildFullScript">
+  </Target>
+
+  <Target Name="Clean">
+    <Delete Files="$(OutputPath)\$(Name).sql" ContinueOnError="true" />
+    <Delete Files="$(OutputPath)\sample.sql" ContinueOnError="true" />
+    <Delete Files="$(OutputPath)\structure.sql" ContinueOnError="true" />
+    <Delete Files="$(OutputPath)\programmability.sql" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="Rebuild">
+    <CallTarget Targets="Clean" />
+    <CallTarget Targets="Build" />
+  </Target>
+
+  <Target Name="Deploy" DependsOnTargets="Build">
+    <Message Importance="high" Text="Creating database backup" />
+    <SqlCmd Server="$(Server)" Database="master" User="$(UserName)" Password="$(Password)" ScriptFileName="Infrastructure/backup.sql" Variables="DatabaseName=$(Database) BackupName=$(Backup)" />
+    <SqlCmd Server="$(Server)" Database="$(Database)" User="$(UserName)" Password="$(Password)" ScriptFileName="$(OutputPath)\$(Name).sql" IgnoreExitCode="True">
+      <Output TaskParameter="ExitCode" ItemName="ExitCode" />
+    </SqlCmd>
+    <!-- Restore database on error -->
+    <Message Importance="high" Condition="@(ExitCode) != '0'" Text="Restoring database" />
+    <SqlCmd Condition="@(ExitCode) != '0'" Server="$(Server)" Database="master" User="$(UserName)" Password="$(Password)" ScriptFileName="Infrastructure/restore.sql" Variables="DatabaseName=$(Database) BackupName=$(Backup)" />
+  </Target>
+
+  <Target Name="CreateDatabase">
+    <SqlCmd Server="$(Server)" Database="master" User="$(UserName)" Password="$(Password)" ScriptFileName="Infrastructure/createDatabase.sql" Variables="DatabaseName=$(Database)" />
+    <CallTarget Targets="Deploy" />
+  </Target>
+
+  <Target Name="Sample">
+    <SqlCmd Server="$(Server)" Database="$(Database)" User="$(UserName)" Password="$(Password)" ScriptFileName="$(OutputPath)\sample.sql"/>
+  </Target>
+
+  <Target Name="CreateOutputDirectory">
+    <MakeDir Directories="$(OutputPath)" />
+  </Target>
+  
+  <Target Name="BuildSample">
+    <CreateItem Include="Sample Data\\**\*.sql">
+      <Output ItemName="SampleScripts" TaskParameter="Include" />
+    </CreateItem>
+
+    <Combine Source="@(SampleScripts)" Output="$(OutputPath)\sample.sql" />
+  </Target>
+
+  <Target Name="BuildStructure">
+    <CreateItem Include="Migrations\\**\*.sql">
+      <Output ItemName="MigrationScripts" TaskParameter="Include" />
+    </CreateItem>
+    <Combine Source="@(MigrationScripts)" AllowEmptyIndex="False" Output="$(OutputPath)\_structure.sql" Before="Infrastructure\before-migration.sql" After="Infrastructure\after-migration.sql" />
+    <Combine Source="Infrastructure\version.sql;$(OutputPath)\_structure.sql" Output="$(OutputPath)\structure.sql" />
+    <Delete Files="$(OutputPath)\_structure.sql" />
+  </Target>
+
+  <Target Name="BuildProgrammability">
+    <CreateItem Include="Programmability\\**\*.sql">
+      <Output ItemName="ProgrammabilityScripts" TaskParameter="Include" />
+    </CreateItem>
+    <Combine Source="@(ProgrammabilityScripts)" Output="$(OutputPath)\_programmability.sql" />
+    <Combine Source="Infrastructure\drop.sql;$(OutputPath)\_programmability.sql" Output="$(OutputPath)\programmability.sql" />
+    <Delete Files="$(OutputPath)\_programmability.sql" />
+  </Target>
+
+  <Target Name="BuildFullScript" DependsOnTargets="BuildStructure;BuildProgrammability" >
+    <Combine Source="$(OutputPath)\structure.sql;$(OutputPath)\programmability.sql" Output="$(OutputPath)\$(Name).sql" />
+  </Target>
+</Project>

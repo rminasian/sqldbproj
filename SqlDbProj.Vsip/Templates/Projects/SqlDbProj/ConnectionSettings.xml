@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
+  <PropertyGroup>
+    <Server>(local)</Server>
+    <Database>SqlDbProj</Database>
+    <UserName>sa</UserName>
+    <Password>sa</Password>
+    <Backup>$(Name).bak</Backup>
+  </PropertyGroup>
+</Project>
