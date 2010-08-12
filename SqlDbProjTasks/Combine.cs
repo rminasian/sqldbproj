@@ -5,6 +5,7 @@ using System.Linq;
 
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
+using System.Text;
 
 
 namespace SqlDbProjTasks {
@@ -22,9 +23,11 @@ namespace SqlDbProjTasks {
         public string Before { get; set; }
         public string After { get; set; }
         public bool AllowEmptyIndex { get; set; }
+        public string Encoding { get; set; }
 
         public Combine() {
             AllowEmptyIndex = true;
+            Encoding = "UTF-8";
         }
 
         public override bool Execute() {
@@ -33,12 +36,13 @@ namespace SqlDbProjTasks {
             }
 
             var sortedFiles = SortFileList(Source);
-            var beforeTemplate = string.IsNullOrEmpty(Before) ? string.Empty : File.ReadAllText(Before);
-            var afterTemplate = string.IsNullOrEmpty(After) ? string.Empty : File.ReadAllText(After);
-            using (var output = File.CreateText(Output)) {
+            var encoding = System.Text.Encoding.GetEncoding(Encoding);
+            var beforeTemplate = string.IsNullOrEmpty(Before) ? string.Empty : File.ReadAllText(Before, encoding);
+            var afterTemplate = string.IsNullOrEmpty(After) ? string.Empty : File.ReadAllText(After, encoding);
+            using (var output = new StreamWriter(File.Create(Output), encoding)) {
                 foreach(var file in sortedFiles) {
                     PutTemplate(output, beforeTemplate, file);
-                    output.WriteLine(File.ReadAllText(file.FilePath));
+                    output.WriteLine(File.ReadAllText(file.FilePath, encoding));
                     PutTemplate(output, afterTemplate, file);
                 }
                 output.Flush();
