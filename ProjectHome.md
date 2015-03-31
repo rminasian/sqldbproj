@@ -1,0 +1,1 @@
+Visual Studio interation package + project skeleton template + msbuild tasks.
